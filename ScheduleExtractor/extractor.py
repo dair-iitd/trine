@@ -1,3 +1,33 @@
+"""
+Extracts the schedule of an event given raw text that discusses the event.
+Use the schedule function as follows: schedule(text, sutime_xmls, sutime_text)
+
+text is the raw text, sutime_text is the annotated file returned after passing
+raw text through SUTime, and sutime_xmls are the xmls from the sutime_text. An
+example of inputs would be as follows:
+
+text:
+-----
+Scientific and Technical Academy Award Ceremony is an yearly event held to present Academy awards for scientific and technical achievements in motion pictures. 
+
+sutime_xmls:
+------------
+<?xml version="1.0" encoding="UTF-8"?>
+<DOC>
+<TIMEX3 freq="P1X" periodicity="P1Y" quant="EVERY" tid="t1" type="SET" value="P1Y">yearly</TIMEX3>
+<TIMEX3 tid="t2" type="DATE" value="PRESENT_REF">present</TIMEX3>
+</DOC>
+
+sutime_text:
+------------
+<?xml version="1.0" encoding="UTF-8"?>
+<DOC>
+  <DATE>2013-07-14</DATE>
+  <TEXT>Scientific and Technical Academy Award Ceremony is an <TIMEX3 tid="t1" type="SET" value="P1Y">yearly</TIMEX3> event held to <TIMEX3 tid="t2" type="DATE" value="PRESENT_REF">present</TIMEX3> Academy awards for scientific and technical achievements in motion pictures. 
+</TEXT>
+</DOC>
+"""
+
 import os
 import re
 from xml.dom import minidom
@@ -5,12 +35,6 @@ from collections import Counter
 
 import values
 
-# TODO: change 2013 in present time of SUTime to something like 2020 Jan 1st!
-
-labelled_dir = '/Users/surag/Desktop/BTP/Periodicity/freebase_clean_labelled_data/'
-unlabelled_dir = '/Users/surag/Desktop/BTP/Periodicity/freebase_clean_data/'
-sutime_labelled_dir = '/Users/surag/Desktop/BTP/Periodicity/fine_grained/SUTimeAnnotated/labelled/'
-sutime_unlabelled_dir = '/Users/surag/Desktop/BTP/Periodicity/fine_grained/SUTimeAnnotated/unlabelled/'
 
 day_weekend_prefix = '(first|1st|second|2nd|third|3rd|fourth|4th|last)'
 day_week_weekend   = '(monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend|week)'
@@ -18,22 +42,6 @@ months_seasons     = '(january|february|march|april|may|june|july|august|septemb
 modifiers		   = '(early|mid|late|end)'
 relative_extractions = '^' + day_week_weekend + '$|^(the day|this day|the present day|yesterday|today|tomorrow|sunrise|dusk|dawn|the modern day)$'
 
-def first_occurence(text,sutime_xmls,sutime_text):
-	first_trigger = r'(beg[au]n(ning)? in|etablished in|inception in|initiat(ed|ion) in|inaugurat(ed|ion) in|launched in|start(ed|ing) in|debut(ing)? in|first held in|first happened in|founded in|created in|inaugral edition in|founded in|first edition in|dating( back)? to|every year since|[^/.] since)'
-	
-	if re.search(first_trigger + ' [12][0-9]{3,3}',text.lower()):
-		index = re.search(first_trigger + ' [12][0-9]{3,3}',text.lower()).end()
-		return(text[index-4:index])
-		
-	if re.search('(first|started|inaugral)[^/.]*[12][0-9]{3,3}',text.lower()):
-		index = re.search('(started|first|inaugral)[^/.]*[12][0-9]{3,3}',text.lower()).end()
-		return(text[index-4:index])
-		
-	#if re.search(first_trigger + ' ' + months_seasons + ' ' ,text.lower()):
-	#	index = re.search('(started|first|inaugral)[^/.]*[12][0-9]{3,3}',text.lower()).end()
-	#	return(text[index-4:index])
-		
-	return ''
 
 def normalize_sutime(text):
 	if text.find("P1Y")!=-1: return "P1Y"
@@ -51,67 +59,6 @@ def normalize_sutime(text):
 	if text.find("XXXX")!=-1: return "P1Y"
 	
 	return None
-
-def periodicity(text,sutime_xmls,sutime_text):
-	
-	mentions = []
-	
-	for timex in sutime_xmls:
-		if timex.attributes['type'].value == 'SET':
-			
-			attr = [x[0] for x in timex.attributes.items()]
-			
-			if 'periodicity' in attr and normalize_sutime(timex.attributes['periodicity'].value) != None:
-				#return normalize_sutime(timex.attributes['periodicity'].value)
-				mentions.append(normalize_sutime(timex.attributes['periodicity'].value))
-				
-			elif 'value' in attr and  normalize_sutime(timex.attributes['value'].value) != None:
-				#return normalize_sutime(timex.attributes['value'].value)
-				mentions.append(normalize_sutime(timex.attributes['value'].value))
-				
-			elif 'altVal' in attr and  normalize_sutime(timex.attributes['altVal'].value) != None:
-				#return normalize_sutime(timex.attributes['altVal'].value)
-				mentions.append(normalize_sutime(timex.attributes['altVal'].value))
-			
-			elif 'alt_value' in attr and  normalize_sutime(timex.attributes['alt_value'].value) != None:
-				#return normalize_sutime(timex.attributes['alt_value'].value)
-				mentions.append(normalize_sutime(timex.attributes['alt_value'].value))
-	#if mentions: print(mentions)		
-	#return ''
-	
-	# returning most common
-	if Counter(mentions).most_common():
-		return Counter(mentions).most_common(1)[0][0]			
-	else:
-		return ''
-
-def duration(text,sutime_xmls,sutime_text):
-	for timex in sutime_xmls:
-		
-		if timex.attributes['type'].value == 'DURATION' or timex.attributes['type'].value == 'DATE':
-			
-			attr = [x[0] for x in timex.attributes.items()]
-				
-			if 'value' in attr and  normalize_sutime(timex.attributes['value'].value) != None:
-				if not re.search('Y',normalize_sutime(timex.attributes['value'].value)):
-					return normalize_sutime(timex.attributes['value'].value)
-					#print(normalize_sutime(timex.attributes['value'].value))
-
-			elif 'altVal' in attr and  normalize_sutime(timex.attributes['altVal'].value) != None:
-				if not re.search('Y',normalize_sutime(timex.attributes['altVal'].value)):
-					return normalize_sutime(timex.attributes['altVal'].value)
-					#print(normalize_sutime(timex.attributes['altVal'].value))
-
-			elif 'alt_value' in attr and  normalize_sutime(timex.attributes['alt_value'].value) != None:
-				if not re.search('Y',normalize_sutime(timex.attributes['alt_value'].value)):
-					return normalize_sutime(timex.attributes['alt_value'].value)
-					#print(normalize_sutime(timex.attributes['alt_value'].value))
-	
-	# add more
-	if bool(re.search('(Marathon)',text)):
-		return 'P1D'
-	
-	return ''
 
 def non_relative_extraction(timex_text):
 	# a relative extraction would be something like 'today', 'wednesday', etc.
@@ -176,9 +123,6 @@ def next_text_timex(tid,sutime_text):
 	
 	
 def schedule(text,sutime_xmls,sutime_text):
-	
-	# distinguish b/w annual and others?
-	
 	mentions = []
 	
 	for i,timex in enumerate(sutime_xmls):
@@ -223,19 +167,11 @@ def schedule(text,sutime_xmls,sutime_text):
 		md = getattr(values, intermediate[:dash])
 		ms = getattr(values, intermediate[dash+1:])
 		mentions.append(ms + md)
-				
-	#if mentions: print(mentions)		
-	#return ''
 	
 	if mentions:
 		return resolve_schedule(mentions)
 	else:
 		return ''
-	# returning most common
-	#if Counter(mentions).most_common():
-	#	return Counter(mentions).most_common(1)[0][0]			
-	#else:
-	#	return ''	
 
 def resolve_schedule(mentions):
 	
@@ -274,54 +210,3 @@ def duration_post_schedule(schedule):
 	elif re.search('[01][0-9]-[0-3][0-9]',schedule):
 		return 'P1D'		
 	return ''	
-
-def extract(pred,header):
-	for i,event in enumerate(pred):
-		if os.path.isfile(labelled_dir + event['file']):
-			f = open(labelled_dir + event['file'],'rb')
-		else:
-			f = open(unlabelled_dir + event['file'],'rb')
-			
-		text = f.read()
-		f.close()
-		
-		if os.path.isfile(sutime_labelled_dir + event['file'] + '_all'):
-			sutime_xmls = minidom.parse(sutime_labelled_dir + event['file'] + '_all').getElementsByTagName('TIMEX3')
-		else:
-			sutime_xmls = minidom.parse(sutime_unlabelled_dir + event['file'] + '_all').getElementsByTagName('TIMEX3')
-		
-		if os.path.isfile(sutime_labelled_dir + event['file'] ):
-			sutime_text = minidom.parse(sutime_labelled_dir + event['file']).getElementsByTagName('TEXT')[0]
-		else:
-			sutime_text = minidom.parse(sutime_unlabelled_dir + event['file']).getElementsByTagName('TEXT')[0]
-		
-		if header == 'duration_post_schedule':
-			if not pred[i]['duration']:
-				pred[i]['duration'] = globals()[header](pred[i]['schedule'])
-		else:
-			pred[i][header] = globals()[header](text,sutime_xmls,sutime_text)
-			
-	return pred
-
-def extract_sched(freebase_id):
-	if os.path.isfile(labelled_dir + freebase_id):
-		f = open(labelled_dir + freebase_id,'rb')
-	else:
-		f = open(unlabelled_dir + freebase_id,'rb')
-			
-	text = f.read()
-	f.close()
-		
-	if os.path.isfile(sutime_labelled_dir + freebase_id + '_all'):
-		sutime_xmls = minidom.parse(sutime_labelled_dir + freebase_id + '_all').getElementsByTagName('TIMEX3')
-	else:
-		sutime_xmls = minidom.parse(sutime_unlabelled_dir + freebase_id + '_all').getElementsByTagName('TIMEX3')
-		
-	if os.path.isfile(sutime_labelled_dir + freebase_id ):
-		sutime_text = minidom.parse(sutime_labelled_dir + freebase_id).getElementsByTagName('TEXT')[0]
-	else:
-		sutime_text = minidom.parse(sutime_unlabelled_dir + freebase_id).getElementsByTagName('TEXT')[0]
-				
-	return globals()['schedule'](text,sutime_xmls,sutime_text)
-
-			
