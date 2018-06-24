@@ -145,7 +145,7 @@ def sum_out_s(phi_s, instance_year, dists):
     
     for d in range(1,366):
         for sched_idx in day_dict[d]:
-            sched_name = dists[instance_year].keys()[sched_idx]
+            sched_name = list(dists[instance_year].keys())[sched_idx]
             sums[d-1] += phi_s[sched_idx]*dists[instance_year][sched_name].pdf(d)
     
     return sums
@@ -189,7 +189,7 @@ def load_dist_of_a_year(year):
 
     # x_week_of_y distributions
     for month in months:
-        for ordinal in range(1, 5) + [-1]:  # 1, 2, 3, 4, -1 <- last week
+        for ordinal in list(range(1, 5)) + [-1]:  # 1, 2, 3, 4, -1 <- last week
             distyear[str(ordinal) + '_week_of_m' + str(month)] = dist.x_week_of_y_dist(year, int(month), ordinal)
 
     # month_season distributions
@@ -203,7 +203,7 @@ def load_dist_of_a_year(year):
     # x_day_of_y distributions
     for month in months:
         for day in range(7):  # {0 for Monday, 6 for Sunday}
-            for ordinal in range(1, 5) + [-1]:  # 1, 2, 3, 4, -1 <- last
+            for ordinal in list(range(1, 5)) + [-1]:  # 1, 2, 3, 4, -1 <- last
                 distyear[str(ordinal) + '_' + str(day) + '_day_of_m' + str(month)] = dist.x_day_of_m_dist(year,
                                                                                                           int(month),
                                                                                                           day, ordinal)
@@ -262,6 +262,15 @@ def marginal_inference_parallel(input):
     
     print('finished batch : ' + str(batch_id))
     return ranked_lists
+
+def get_dists(event_input, instance_year):
+    dists = OrderedDict()
+    inst_years = set([y[0] for x in event_input for y in x])
+    inst_years = inst_years.union(set(range(2005,2018)))
+    for inst_year in inst_years.union(set([instance_year])):
+        if inst_year not in dists:
+            dists[inst_year] = load_dist_of_a_year(inst_year)
+    return dists
     
 
 if __name__ == '__main__':
@@ -269,14 +278,8 @@ if __name__ == '__main__':
     cur_instance_ilp_input = [
         [(2011, 3, 21)]
         ]
-
-    dists = OrderedDict()
-    inst_years = set([y[0] for x in cur_instance_ilp_input for y in x])
-    inst_years = inst_years.union(set(range(2005,2017)))
-    for inst_year in inst_years:
-        if inst_year not in dists:
-            dists[inst_year] = load_dist_of_a_year(inst_year)
-
-    ranked_list = marginal_inference(cur_instance_ilp_input, [''], dists, 2006, [[0.52]])
+    query_instance = 2016
+    dists = get_dists(cur_instance_ilp_input, query_instance)
+    ranked_list = marginal_inference(cur_instance_ilp_input, [''], dists, query_instance, [[0.52]])
 
     pdb.set_trace()
